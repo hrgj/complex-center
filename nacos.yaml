@@ -1,0 +1,209 @@
+---
+# Namespace配置
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nacos
+
+---
+# 数据库密码Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nacos-db-secret
+  namespace: nacos
+type: Opaque
+data:
+  password: bmEjMjNkWWNvczQ4VUI1Mg==  # na#23dYcos48UB52
+
+---
+# JWT密钥Secret（新增）
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nacos-jwt-secret
+  namespace: nacos
+type: Opaque
+data:
+  jwt-secret-key: ZVRmeXB4R2hZdVJ1ZTVUUGx5N216WlBNeUZPbDQwQk9DQmJKVFJXLzhoUT0=  # eTfypxGhYuRue5TPly7mzZPMyFOl40BOCBbJTRW/8hQ=
+
+---
+# ConfigMap配置（已开启鉴权）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nacos-config
+  namespace: nacos
+data:
+  application.properties: |
+    # 数据源配置
+    spring.datasource.platform=mysql
+    db.num=1
+    db.url.0=jdbc:mysql://172.20.5.3:3306/nacos?characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
+    db.user.0=nacos
+    db.password.0=${DB_PASSWORD}
+
+    # 鉴权配置（核心改动）
+    nacos.core.auth.enabled=true
+    nacos.core.auth.system.type=nacos
+    nacos.core.auth.server.identity.key=auth-key
+    nacos.core.auth.server.identity.value=secure-identity-value
+    nacos.core.auth.plugin.nacos.token.secret.key=${NACOS_AUTH_TOKEN}
+    nacos.core.auth.plugin.nacos.token.expire.seconds=1800
+
+    # 集群配置
+    nacos.core.auth.caching.enabled=true
+    nacos.istio.mcp.server.enabled=false
+    nacos.discovery.dom=namespace1,namespace2
+    
+    # 性能优化
+    nacos.naming.distro.taskDispatchPeriod=200
+    nacos.naming.distro.batchSyncKeyCount=1000
+  cluster.conf: |
+    nacos-0.nacos-headless.nacos.svc.cluster.local:8848
+    nacos-1.nacos-headless.nacos.svc.cluster.local:8848
+    nacos-2.nacos-headless.nacos.svc.cluster.local:8848
+
+---
+# Headless Service（保持不变）
+apiVersion: v1
+kind: Service
+metadata:
+  name: nacos-headless
+  namespace: nacos
+  labels:
+    app: nacos
+spec:
+  clusterIP: None
+  ports:
+    - name: server
+      port: 8848
+      targetPort: 8848
+    - name: raft
+      port: 7848
+      targetPort: 7848
+  selector:
+    app: nacos
+  publishNotReadyAddresses: true
+
+---
+# ClusterIP Service（保持不变）
+apiVersion: v1
+kind: Service
+metadata:
+  name: nacos
+  namespace: nacos
+  labels:
+    app: nacos
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8848
+      targetPort: 8848
+    - name: raft
+      port: 7848
+      targetPort: 7848
+  selector:
+    app: nacos
+
+---
+# StatefulSet配置（新增JWT密钥引用）
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nacos
+  namespace: nacos
+spec:
+  serviceName: nacos-headless
+  replicas: 3
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: nacos
+  template:
+    metadata:
+      labels:
+        app: nacos
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["nacos"]
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: nacos-server
+          image: nacos/nacos-server:v2.5.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8848
+              name: server
+            - containerPort: 7848
+              name: raft
+          env:
+            - name: MODE
+              value: "cluster"
+            - name: PREFER_HOST_MODE
+              value: "hostname"
+            - name: NACOS_SERVERS
+              value: "nacos-0.nacos-headless.nacos.svc.cluster.local:8848 nacos-1.nacos-headless.nacos.svc.cluster.local:8848 nacos-2.nacos-headless.nacos.svc.cluster.local:8848"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nacos-db-secret
+                  key: password
+            # 新增JWT密钥注入
+            - name: NACOS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nacos-jwt-secret
+                  key: jwt-secret-key
+          volumeMounts:
+            - name: nacos-config
+              mountPath: /home/nacos/conf/application.properties
+              subPath: application.properties
+            - name: nacos-config
+              mountPath: /home/nacos/conf/cluster.conf
+              subPath: cluster.conf
+            - name: nacos-logs
+              mountPath: /home/nacos/logs
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          startupProbe:
+            httpGet:
+              path: /nacos/actuator/health
+              port: 8848
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /nacos/actuator/health
+              port: 8848
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /nacos/actuator/health
+              port: 8848
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: nacos-config
+          configMap:
+            name: nacos-config
+            items:
+              - key: application.properties
+                path: application.properties
+              - key: cluster.conf
+                path: cluster.conf
+        - name: nacos-logs
+          emptyDir: {}
