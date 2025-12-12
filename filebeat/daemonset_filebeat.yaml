@@ -1,0 +1,356 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    deprecated.daemonset.template.generation: "108"
+    description: filebeat
+  creationTimestamp: "2025-11-27T05:55:47Z"
+  generation: 109
+  labels:
+    k8s-app: filebeat
+    qcloud-app: filebeat
+  managedFields:
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:deprecated.daemonset.template.generation: {}
+            f:description: {}
+          f:labels:
+            .: {}
+            f:k8s-app: {}
+            f:qcloud-app: {}
+        f:spec:
+          f:minReadySeconds: {}
+          f:revisionHistoryLimit: {}
+          f:selector: {}
+          f:template:
+            f:metadata:
+              f:annotations:
+                .: {}
+                f:qcloud-redeploy-timestamp: {}
+              f:labels:
+                .: {}
+                f:k8s-app: {}
+                f:qcloud-app: {}
+            f:spec:
+              f:affinity: {}
+              f:containers:
+                k:{"name":"filebeat"}:
+                  .: {}
+                  f:args: {}
+                  f:env:
+                    .: {}
+                    k:{"name":"ELASTICSEARCH_HOST"}:
+                      .: {}
+                      f:name: {}
+                      f:valueFrom:
+                        .: {}
+                        f:secretKeyRef: {}
+                    k:{"name":"ELASTICSEARCH_PASSWORD"}:
+                      .: {}
+                      f:name: {}
+                      f:valueFrom:
+                        .: {}
+                        f:secretKeyRef: {}
+                    k:{"name":"ELASTICSEARCH_PORT"}:
+                      .: {}
+                      f:name: {}
+                      f:valueFrom:
+                        .: {}
+                        f:secretKeyRef: {}
+                    k:{"name":"ELASTICSEARCH_USERNAME"}:
+                      .: {}
+                      f:name: {}
+                      f:valueFrom:
+                        .: {}
+                        f:secretKeyRef: {}
+                    k:{"name":"NODE_NAME"}:
+                      .: {}
+                      f:name: {}
+                      f:value: {}
+                    k:{"name":"POD_NAME"}:
+                      .: {}
+                      f:name: {}
+                      f:valueFrom:
+                        .: {}
+                        f:fieldRef: {}
+                    k:{"name":"elasticsearch-ca-cert"}:
+                      .: {}
+                      f:name: {}
+                      f:valueFrom:
+                        .: {}
+                        f:secretKeyRef: {}
+                  f:image: {}
+                  f:imagePullPolicy: {}
+                  f:name: {}
+                  f:resources:
+                    .: {}
+                    f:limits:
+                      .: {}
+                      f:cpu: {}
+                      f:memory: {}
+                    f:requests:
+                      .: {}
+                      f:cpu: {}
+                      f:memory: {}
+                  f:securityContext:
+                    .: {}
+                    f:privileged: {}
+                    f:runAsUser: {}
+                  f:terminationMessagePath: {}
+                  f:terminationMessagePolicy: {}
+                  f:volumeMounts:
+                    .: {}
+                    k:{"mountPath":"/etc/filebeat.yml"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                      f:readOnly: {}
+                      f:subPath: {}
+                    k:{"mountPath":"/etc/ssl/elasticsearch"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                      f:readOnly: {}
+                    k:{"mountPath":"/usr/share/filebeat/data"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                    k:{"mountPath":"/var/lib/docker/containers"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                      f:readOnly: {}
+                    k:{"mountPath":"/var/log/containers"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                    k:{"mountPath":"/var/log/pods"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                      f:readOnly: {}
+              f:dnsPolicy: {}
+              f:restartPolicy: {}
+              f:schedulerName: {}
+              f:securityContext: {}
+              f:serviceAccount: {}
+              f:serviceAccountName: {}
+              f:terminationGracePeriodSeconds: {}
+              f:volumes:
+                .: {}
+                k:{"name":"config"}:
+                  .: {}
+                  f:configMap:
+                    .: {}
+                    f:defaultMode: {}
+                    f:name: {}
+                  f:name: {}
+                k:{"name":"data"}:
+                  .: {}
+                  f:hostPath:
+                    .: {}
+                    f:path: {}
+                    f:type: {}
+                  f:name: {}
+                k:{"name":"elasticsearch-ca"}:
+                  .: {}
+                  f:name: {}
+                  f:secret:
+                    .: {}
+                    f:defaultMode: {}
+                    f:items: {}
+                    f:secretName: {}
+                k:{"name":"varlibdockercontainers"}:
+                  .: {}
+                  f:hostPath:
+                    .: {}
+                    f:path: {}
+                    f:type: {}
+                  f:name: {}
+                k:{"name":"varlog"}:
+                  .: {}
+                  f:hostPath:
+                    .: {}
+                    f:path: {}
+                    f:type: {}
+                  f:name: {}
+                k:{"name":"varlogcontainers"}:
+                  .: {}
+                  f:hostPath:
+                    .: {}
+                    f:path: {}
+                    f:type: {}
+                  f:name: {}
+          f:updateStrategy:
+            f:rollingUpdate:
+              .: {}
+              f:maxSurge: {}
+              f:maxUnavailable: {}
+            f:type: {}
+      manager: tke-platform-api
+      operation: Update
+      time: "2025-12-12T09:22:22Z"
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:status:
+          f:currentNumberScheduled: {}
+          f:desiredNumberScheduled: {}
+          f:numberAvailable: {}
+          f:numberReady: {}
+          f:observedGeneration: {}
+          f:updatedNumberScheduled: {}
+      manager: kube-controller-manager
+      operation: Update
+      subresource: status
+      time: "2025-12-12T09:25:01Z"
+  name: filebeat
+  namespace: logging
+  resourceVersion: "20456761837"
+  uid: 8fb0dbe1-96df-44c2-8788-90623f6559d9
+spec:
+  minReadySeconds: 30
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      k8s-app: filebeat
+      qcloud-app: filebeat
+  template:
+    metadata:
+      annotations:
+        qcloud-redeploy-timestamp: "1765531341120"
+      creationTimestamp: null
+      labels:
+        k8s-app: filebeat
+        qcloud-app: filebeat
+    spec:
+      affinity: {}
+      containers:
+        - args:
+            - -c
+            - /etc/filebeat.yml
+            - -e
+          env:
+            - name: ELASTICSEARCH_HOST
+              valueFrom:
+                secretKeyRef:
+                  key: ELASTICSEARCH_HOST
+                  name: filebeat-secret
+                  optional: false
+            - name: ELASTICSEARCH_PORT
+              valueFrom:
+                secretKeyRef:
+                  key: ELASTICSEARCH_PORT
+                  name: filebeat-secret
+                  optional: false
+            - name: ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  key: ELASTICSEARCH_USERNAME
+                  name: filebeat-secret
+                  optional: false
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: ELASTICSEARCH_PASSWORD
+                  name: filebeat-secret
+                  optional: false
+            - name: NODE_NAME
+              value: spec.nodeName
+            - name: elasticsearch-ca-cert
+              valueFrom:
+                secretKeyRef:
+                  key: ca.crt
+                  name: filebeat-secret
+                  optional: false
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+          image: docker.elastic.co/beats/filebeat:9.2.1
+          imagePullPolicy: IfNotPresent
+          name: filebeat
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2024Mi
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            privileged: false
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/filebeat.yml
+              name: config
+              readOnly: true
+              subPath: filebeat.yml
+            - mountPath: /var/log/pods
+              name: varlog
+              readOnly: true
+            - mountPath: /var/lib/docker/containers
+              name: varlibdockercontainers
+              readOnly: true
+            - mountPath: /usr/share/filebeat/data
+              name: data
+            - mountPath: /etc/ssl/elasticsearch
+              name: elasticsearch-ca
+              readOnly: true
+            - mountPath: /var/log/containers
+              name: varlogcontainers
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: filebeat
+      serviceAccountName: filebeat
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: filebeat-config
+          name: config
+        - hostPath:
+            path: /var/log/pods
+            type: DirectoryOrCreate
+          name: varlog
+        - hostPath:
+            path: /var/lib/docker/containers
+            type: DirectoryOrCreate
+          name: varlibdockercontainers
+        - hostPath:
+            path: /var/lib/filebeat-data
+            type: DirectoryOrCreate
+          name: data
+        - name: elasticsearch-ca
+          secret:
+            defaultMode: 420
+            items:
+              - key: ca.crt
+                mode: 420
+                path: ca.crt
+            secretName: filebeat-secret
+        - hostPath:
+            path: /var/log/containers
+            type: DirectoryOrCreate
+          name: varlogcontainers
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+status:
+  currentNumberScheduled: 5
+  desiredNumberScheduled: 5
+  numberAvailable: 5
+  numberMisscheduled: 0
+  numberReady: 5
+  observedGeneration: 109
+  updatedNumberScheduled: 5

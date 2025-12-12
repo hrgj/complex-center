@@ -1,0 +1,161 @@
+apiVersion: v1
+data:
+  filebeat.yml: |-
+    filebeat.autodiscover:
+      providers:
+        - type: kubernetes
+          templates:
+            - condition:
+                equals:
+                  kubernetes.namespace: test
+              config:
+                - type: filestream
+                  id: container-${data.kubernetes.container.id}
+                  prospector.scanner.symlinks: true
+                  close.on_state_change.removed: false
+                  ignore_older: 10m
+                  clean_removed: true
+                  clean_inactive: 60m
+                  harvester.limits.ignore_older: 10m
+                  multiline.type: pattern
+                  multiline.pattern: '^\|(INFO|DEBUG|WARN|ERROR|FATAL)\|'
+                  multiline.negate: true
+                  multiline.match: after
+                  multiline.max_lines: 200
+                  multiline.timeout: 5s
+                  parsers:
+                    - container: ~
+                  paths:
+                    - /var/log/containers/*-${data.kubernetes.container.id}.log
+                  exclude_lines: ["^\\s+[\\-`('.|_]"]
+                  harvester:
+                    scan_frequency: 10s      # 采集器扫描间隔
+                    max_bytes: 10485760      # 单次读取最大字节（10MB）
+                    timeout: 30s             # 读取超时时间
+                    backoff: 1s              # 文件无新内容时的等待时间
+                    max_backoff: 10s         # 最大等待时间
+                    backoff_factor: 2        # 退避因子
+                  processors:
+                    - drop_fields:
+                        fields:
+                          # - "message"
+                          - "log"
+                          - "fields"
+                          - "input"
+                          - "ecs"
+                          - "fields"
+                          - "kubernetes.node.labels"
+                          - "kubernetes.replicaset.name"
+                          - "kubernetes.pod.uid"
+                          - "kubernetes.namespace_uid"
+                          - "kubernetes.node.uid"
+                          - "kubernetes.namespace_labels"
+                          - "kubernetes.labels"
+                          - "_ignored"
+                          - "_score"
+                          - "_index"
+                    # 1. 过滤非管道符日志
+                    - if:
+                        not:
+                          contains:
+                            message: "|"
+                      then:
+                        - drop_event: {}
+
+                    # 2. 使用 dissect 解析
+                    - dissect:
+                        tokenizer: "|%{level}|%{traceId}|%{user_ip}|%{server_ip}|%{user_code}|%{user_name}|%{site_code}|%{site_name}|%{app_name}|%{timestamp}|%{thread}|%{path}|%{method}|%{content}"
+                        field: "message"
+                        target_prefix: ""
+                        overwrite_keys: true
+                        trim_values: "right"
+                        trim_chars: "\r\n"
+                        ignore_failure: true
+                    - timestamp:
+                        field: "timestamp"
+                        layouts:
+                          - "yyyy-MM-dd HH:mm:ss.SSS"
+                          - "yyyy-MM-dd HH:mm:ss"
+                        timezone: "Asia/Shanghai"
+                        ignore_failure: true
+                        ignore_missing: true
+                    - if:
+                        has_fields: ['message']
+                      then:
+                        - script:
+                            lang: javascript
+                            source: |
+                              function process(event) {
+                                // 从原始消息中提取堆栈信息
+                                var originalMsg = event.Get('message');
+                                if (!originalMsg) {
+                                  return;
+                                }
+
+                                var msgStr = originalMsg.toString();
+
+                                // 查找结构化部分结束的位置
+                                var structuredEndIndex = msgStr.indexOf('\n');
+                                if (structuredEndIndex === -1) {
+                                  structuredEndIndex = msgStr.length;
+                                }
+
+                                // 提取结构化部分之后的内容作为堆栈信息
+                                var stacktrace = msgStr.substring(structuredEndIndex).trim();
+
+                                // 只对ERROR/FATAL日志保存堆栈信息
+                                var level = event.Get('level');
+                                if ((level === 'ERROR' || level === 'FATAL') && stacktrace.length > 0) {
+                                  event.Put('stacktrace', stacktrace);
+
+                                  // 如果content字段为空，用堆栈信息的第一行填充
+                                  var content = event.Get('content');
+                                  if (!content || content.trim().length === 0) {
+                                    var firstLine = stacktrace.split('\n')[0];
+                                    if (firstLine && firstLine.trim().length > 0) {
+                                      event.Put('content', firstLine.trim());
+                                    }
+                                  }
+                                }
+                              }
+
+                        # 5. 如果是错误日志，添加标签
+                        - if:
+                            or:
+                              - equals:
+                                  level: "ERROR"
+                              - equals:
+                                  level: "FATAL"
+                              - has_fields: ['stacktrace']
+                          then:
+                            - add_fields:
+                                fields:
+                                  tags: ["error", "has_exception"]
+                  else:
+                    - drop_event: {}
+
+
+    output.elasticsearch:
+      hosts: ['${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}']
+      username: ${ELASTICSEARCH_USERNAME}
+      password: ${ELASTICSEARCH_PASSWORD}
+      ssl.certificate_authorities: ["/etc/ssl/elasticsearch/ca.crt"]
+      indices:
+        - index: "test-%{+yyyy.MM.dd}"
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-11-27T11:13:00Z"
+  managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:data:
+          .: {}
+          f:filebeat.yml: {}
+      manager: tke-platform-api
+      operation: Update
+      time: "2025-12-12T09:22:12Z"
+  name: filebeat-config
+  namespace: logging
+  resourceVersion: "20456649176"
+  uid: dd24f7b1-7c3e-4e93-baad-6493ae9673bb
