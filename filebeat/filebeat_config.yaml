@@ -6,8 +6,11 @@ data:
         - type: kubernetes
           templates:
             - condition:
-                equals:
-                  kubernetes.namespace: test
+                or:
+                  - equals:
+                      kubernetes.namespace: gray
+                  - equals:
+                      kubernetes.namespace: prod
               config:
                 - type: filestream
                   id: container-${data.kubernetes.container.id}
@@ -16,18 +19,16 @@ data:
                   ignore_older: 10m
                   clean_removed: true
                   clean_inactive: 60m
-                  harvester.limits.ignore_older: 10m
-                  multiline.type: pattern
-                  multiline.pattern: '^\|(INFO|DEBUG|WARN|ERROR|FATAL)\|'
-                  multiline.negate: true
-                  multiline.match: after
-                  multiline.max_lines: 200
-                  multiline.timeout: 5s
                   parsers:
                     - container: ~
+                    - multiline:
+                        type: pattern
+                        pattern: '^[[:space:]]+(at\b|\.{3}\s)|^Caused by:|^[a-zA-Z][a-zA-Z0-9_$.]*Exception:|^Exception in thread'
+                        negate: false
+                        match: after
+                        timeout: 10s
                   paths:
                     - /var/log/containers/*-${data.kubernetes.container.id}.log
-                  exclude_lines: ["^\\s+[\\-`('.|_]"]
                   harvester:
                     scan_frequency: 10s      # 采集器扫描间隔
                     max_bytes: 10485760      # 单次读取最大字节（10MB）
@@ -36,6 +37,20 @@ data:
                     max_backoff: 10s         # 最大等待时间
                     backoff_factor: 2        # 退避因子
                   processors:
+                    - drop_event:
+                        when:
+                          or:
+                            - not:
+                                regexp:
+                                  message: '^\|'
+                            - contains:
+                                message: "==> Preparing:"
+                            - contains:
+                                message: "==> Parameters:"
+                            - contains:
+                                message: "JDBC Connection ["
+                            - regexp:
+                                message: '^\[DEBUG\].*BaseJdbcLogger'
                     - drop_fields:
                         fields:
                           # - "message"
@@ -54,97 +69,57 @@ data:
                           - "_ignored"
                           - "_score"
                           - "_index"
+                          - "event.original"
+                          - "_source"
                     # 1. 过滤非管道符日志
-                    - if:
-                        not:
-                          contains:
-                            message: "|"
-                      then:
-                        - drop_event: {}
-
+                    # - if:
+                    #     not:
+                    #       contains:
+                    #         message: "|"
+                    #   then:
+                    #     - drop_event: {}
                     # 2. 使用 dissect 解析
-                    - dissect:
-                        tokenizer: "|%{level}|%{traceId}|%{user_ip}|%{server_ip}|%{user_code}|%{user_name}|%{site_code}|%{site_name}|%{app_name}|%{timestamp}|%{thread}|%{path}|%{method}|%{content}"
-                        field: "message"
-                        target_prefix: ""
-                        overwrite_keys: true
-                        trim_values: "right"
-                        trim_chars: "\r\n"
-                        ignore_failure: true
-                    - timestamp:
-                        field: "timestamp"
-                        layouts:
-                          - "yyyy-MM-dd HH:mm:ss.SSS"
-                          - "yyyy-MM-dd HH:mm:ss"
-                        timezone: "Asia/Shanghai"
-                        ignore_failure: true
-                        ignore_missing: true
-                    - if:
-                        has_fields: ['message']
-                      then:
-                        - script:
-                            lang: javascript
-                            source: |
-                              function process(event) {
-                                // 从原始消息中提取堆栈信息
-                                var originalMsg = event.Get('message');
-                                if (!originalMsg) {
-                                  return;
-                                }
-
-                                var msgStr = originalMsg.toString();
-
-                                // 查找结构化部分结束的位置
-                                var structuredEndIndex = msgStr.indexOf('\n');
-                                if (structuredEndIndex === -1) {
-                                  structuredEndIndex = msgStr.length;
-                                }
-
-                                // 提取结构化部分之后的内容作为堆栈信息
-                                var stacktrace = msgStr.substring(structuredEndIndex).trim();
-
-                                // 只对ERROR/FATAL日志保存堆栈信息
-                                var level = event.Get('level');
-                                if ((level === 'ERROR' || level === 'FATAL') && stacktrace.length > 0) {
-                                  event.Put('stacktrace', stacktrace);
-
-                                  // 如果content字段为空，用堆栈信息的第一行填充
-                                  var content = event.Get('content');
-                                  if (!content || content.trim().length === 0) {
-                                    var firstLine = stacktrace.split('\n')[0];
-                                    if (firstLine && firstLine.trim().length > 0) {
-                                      event.Put('content', firstLine.trim());
-                                    }
-                                  }
-                                }
-                              }
-
-                        # 5. 如果是错误日志，添加标签
-                        - if:
-                            or:
-                              - equals:
-                                  level: "ERROR"
-                              - equals:
-                                  level: "FATAL"
-                              - has_fields: ['stacktrace']
-                          then:
-                            - add_fields:
-                                fields:
-                                  tags: ["error", "has_exception"]
-                  else:
-                    - drop_event: {}
+                    # - dissect:
+                    #     tokenizer: "|%{level}|%{traceId}|%{user_ip}|%{server_ip}|%{user_code}|%{user_name}|%{site_code}|%{site_name}|%{app_name}|%{timestamp}|%{thread}|%{path}|%{method}|%{content}"
+                    #     field: "message"
+                    #     target_prefix: ""
+                    #     overwrite_keys: true
+                    #     ignore_failure: true
+                    #     # trim_chars: "\r\n\t "
+                    # - timestamp:
+                    #     field: "timestamp"
+                    #     layouts:
+                    #       - "yyyy-MM-dd HH:mm:ss.SSS"
+                    #       - "yyyy-MM-dd HH:mm:ss"
+                    #     timezone: "Asia/Shanghai"
+                    #     ignore_failure: true
+                    #     ignore_missing: true
+                    # - drop_fields:
+                    #     fields: ["message"]
+                    #     ignore_missing: true
 
 
-    output.elasticsearch:
-      hosts: ['${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}']
-      username: ${ELASTICSEARCH_USERNAME}
-      password: ${ELASTICSEARCH_PASSWORD}
-      ssl.certificate_authorities: ["/etc/ssl/elasticsearch/ca.crt"]
-      indices:
-        - index: "test-%{+yyyy.MM.dd}"
+    # output.elasticsearch:
+    #   hosts: ['${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}']
+    #   username: ${ELASTICSEARCH_USERNAME}
+    #   password: ${ELASTICSEARCH_PASSWORD}
+    #   ssl.certificate_authorities: ["/etc/ssl/elasticsearch/ca.crt"]
+    #   indices:
+    #     - index: "test-%{+yyyy.MM.dd}"
+    output.logstash:
+      # 核心：Logstash的地址（可以配置多个，实现负载均衡）
+      hosts: ["172.20.2.14:5045"]
+      timeout: 5
+      bulk_max_size: 2048
+      # 可选：启用TLS加密传输（如果Logstash配置了SSL/TLS）
+      # ssl.enabled: true
+      # ssl.certificate_authorities: ["/etc/filebeat/certs/ca.crt"]
+      # 可选：重连策略（默认自动重连，可指定重连间隔）
+      backoff.init: 1s
+      backoff.max: 10s
 kind: ConfigMap
 metadata:
-  creationTimestamp: "2025-11-27T11:13:00Z"
+  creationTimestamp: "2025-12-17T09:26:21Z"
   managedFields:
     - apiVersion: v1
       fieldsType: FieldsV1
@@ -154,8 +129,8 @@ metadata:
           f:filebeat.yml: {}
       manager: tke-platform-api
       operation: Update
-      time: "2025-12-12T09:22:12Z"
+      time: "2025-12-17T09:27:14Z"
   name: filebeat-config
   namespace: logging
-  resourceVersion: "20456649176"
-  uid: dd24f7b1-7c3e-4e93-baad-6493ae9673bb
+  resourceVersion: "9749664926"
+  uid: a4ea3edf-43b1-458a-b560-68fedcc03a2f

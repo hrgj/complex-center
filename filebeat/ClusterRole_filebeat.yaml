@@ -1,0 +1,61 @@
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: "2025-12-17T11:24:40Z"
+  labels:
+    k8s-app: filebeat
+  managedFields:
+    - apiVersion: rbac.authorization.k8s.io/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:k8s-app: {}
+        f:rules: {}
+      manager: tke-platform-api
+      operation: Update
+      time: "2025-12-17T11:24:40Z"
+  name: filebeat
+  resourceVersion: "9754357266"
+  uid: 6824d720-1bb4-418c-bbeb-1ab7c23e9de3
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+      - deployments
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch

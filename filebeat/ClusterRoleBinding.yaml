@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: "2025-12-17T11:26:03Z"
+  labels:
+    k8s-app: filebeat
+  managedFields:
+    - apiVersion: rbac.authorization.k8s.io/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            .: {}
+            f:k8s-app: {}
+        f:roleRef: {}
+        f:subjects: {}
+      manager: tke-platform-api
+      operation: Update
+      time: "2025-12-17T11:26:03Z"
+  name: filebeat
+  resourceVersion: "9754412153"
+  uid: 2ede6590-ddcf-48e6-9d40-17c0d37742b1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: filebeat
+subjects:
+  - kind: ServiceAccount
+    name: filebeat
+    namespace: logging
